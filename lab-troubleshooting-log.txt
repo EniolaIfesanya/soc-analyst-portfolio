@@ -1,0 +1,230 @@
+
+LAB TROUBLESHOOTING LOG
+
+[ENTRY 01]
+Date/Time: 17 June 2026 / 13:51 BST
+Component: VirtualBox 7.x / Windows Server 2022 VM Creation
+
+Error Message:
+"Windows cannot find the Microsoft Software License Terms. Make sure the installation sources are valid and restart the installation."
+
+Symptoms:
+The Windows Server 2022 setup environment boots normally, but immediately halts with a pop-up error dialog box upon clicking "Install Now" or while setup is starting. The installation cannot proceed further.
+
+Root Cause Analysis:
+Oracle VirtualBox automatically attempts an "Unattended Installation" by default when a Windows ISO is detected. It attaches a virtual floppy/auxiliary ISO (`Unattended-...-aux-iso.viso`) containing an automated configuration script. Windows Server setup reads this automated file, conflicts with the unattended script instructions, and fails to parse the licensing terms.
+
+Resolution Steps:
+1. Powered off the stalled virtual machine.
+2. Deleted the corrupted virtual machine and completely removed its virtual hard disk files from storage.
+3. Initiated the creation of a new Virtual Machine in VirtualBox.
+4. Selected the Windows Server 2022 ISO file and explicitly checked the option to "Skip Unattended Installation" (or left "Proceed with Unattended Installation" unchecked depending on VirtualBox version wizard UI).
+5. Allocated sufficient hardware resources (4096 MB RAM, 2 vCPUs, and 50 GB Virtual Hard Disk).
+6. Booted the new VM and manually advanced through the standard Windows Server OS installation wizard successfully.
+
+Status: Resolved / Closed
+--------------------------------------------------------------------------------------------
+
+[ENTRY 02] Date/Time: 18 June 2026 / 13:35 BST
+
+Component: VirtualBox 7.x / Windows Server 2022 Input Interface
+
+Error Message: "Keyboard failure ... Failed to change keyboard parameter. Could not send all scan codes to the virtual keyboard (VERR_PDM_NO_QUEUE_ITEMS)."
+
+Symptoms: The Windows Server 2022 login screen loaded normally, but the virtual machine window became entirely unresponsive to keyboard commands. Attempting to send a Ctrl+Alt+Del signal via the input menu failed, throwing a critical hypervisor error dialog box and preventing account login.
+
+Root Cause Analysis: The VirtualBox hypervisor's internal virtual keyboard input queue became desynchronized from the physical host machine's hardware input driver, causing the input buffer queue to flood and lock up. This blocked the transmission of physical keystroke scan codes to the virtualized operating system.
+
+Resolution Steps:
+
+1. Closed the frozen virtual machine window and selected the option to "Save the machine state."
+
+2. Closed the main Oracle VM VirtualBox Manager application on the host machine.
+
+3. Opened Windows Task Manager (Ctrl+Shift+Esc) on the host laptop and terminated all lingering background VirtualBox processes (e.g., VBoxSVC.exe, VBoxHeadless.exe).
+
+4. Relaunched the VirtualBox Manager application and powered on the Windows Server 2022 VM.
+
+5. Input functionality successfully re-synchronized, allowing a standard login pass.
+
+6. Logged into the Administrator account and provided an explanatory comment to clear the Windows Shutdown Event Tracker prompt triggered by the forced backend process termination.
+
+Status: Resolved / Closed
+
+------------------------------------------------------------------------------------------------------------------
+
+[ENTRY 03]
+Date/Time: 18 June 2026 / 17:30 BST
+
+Component: VirtualBox 7.x Storage Controller / Active Directory Post-Deployment Reboot
+
+Error Message: Hypervisor boot loop demanding an installation medium; storage modification options greyed out / disabled within VM settings.
+
+Symptoms: Following a successful OS configuration and subsequent Active Directory Domain Services (AD DS) promotion, the mandatory post-deployment reboot caused the VM to crash. Upon recovery attempts, the hypervisor entered a loop demanding an optical drive disc selection. Reviewing the VM storage properties showed that the virtual optical drive controller was entirely missing, and the icons required to re-add or modify devices were completely greyed out and unclickable.
+
+Root Cause Analysis: A lingering background conflict from an automated "Unattended Installation" answer-file script interfered with the Active Directory promotion security principal generation. Upon the domain controller's forced reboot, the automated script threw a critical exception that corrupted the VM's state file (.vbox), leaving the hypervisor storage controllers locked in a "Running/Saved" phantom state that blocked manual device edits.
+
+Resolution Steps:
+
+Forcefully powered down the unstable virtual machine instance.
+
+Deleted the corrupted LAB-DCO1 VM template along with all backend configuration files to completely purge the locked registry state.
+
+Initiated a clean rebuild using a distinct naming convention (LAB-DC-01) to bypass lingering hypervisor folder locks.
+
+Explicitly left the Proceed with Unattended Installation toggle unchecked to guarantee the automated script engine remained entirely disabled.
+
+Configured system localization attributes, maintaining English (United States) for primary OS language architecture compatibility while remapping Time/Currency and Keyboard Layout to English (United Kingdom) for host synchronization.
+
+Advanced through the custom Windows installation pipeline up to the "Customize Settings" phase, successfully creating a strong local Administrator password profile.
+
+Forcefully powered down the VM post-install to safely eject the raw installation ISO from the SATA controller, ensuring the subsequent clean boot pulled directly from the newly created virtual hard disk (.vdi).
+
+Status: Resolved / Closed
+
+--------------------------------------------------------------------------------------------
+
+
+[ENTRY 04]
+Date/Time: 18 June 2026 / 19:40 BST
+Component: VirtualBox Network Adapter & AD DS Manual Installation / Reboot
+
+Error Message:
+No error code, but the Internal Network option was missing/greyed out in settings, and the screen went completely pitch black with no hard drive activity during the domain controller reboot.
+
+Symptoms:
+When trying to switch the network adapter from NAT to Internal Network, the option wasn't there because the VM was stuck in a running/saved state. Later, after manually setting a static IP (192.168.10.10) and clicking "Install" on the Active Directory Domain Services wizard, the mandatory reboot caused the VM screen to go completely pitch black. The virtual hard disk light (SATA Port 0) stopped blinking and stayed solid, showing the virtual screen was frozen.
+
+Root Cause Analysis:
+VirtualBox limits what hardware settings you can change when a VM is locked in a running state, and the UI was stuck in a basic view mode. Later, during the heavy Active Directory promotion reboot, the VirtualBox graphics driver failed to hand over the display resolution properly when Windows restarted to apply the new security databases, freezing the virtual display buffer while the drive went idle.
+
+Resolution Steps:
+
+Forcefully powered down the virtual machine to break the hardware state lock.
+
+Opened VM Settings, went to the Network menu, and switched from the "Basic" tab to the "Expert" tab to unlock the hidden adapter menus.
+
+Changed the network adapter setting from NAT to Internal Network and kept the default name 'intnet' to safely isolate the lab.
+
+Powered the VM back on and typed "Successful promotion to Domain Controller" into the Windows Shutdown Event Tracker to clear the sudden power-cut warning.
+
+Opened the network adapter properties inside Windows and manually assigned the static IP 192.168.10.10, subnet mask 255.255.255.0, and set the Preferred DNS to 127.0.0.1 (pointing the server to itself).
+
+Opened Server Manager, ran the manual Add Roles and Features wizard, selected Active Directory Domain Services, and successfully ran the promotion wizard using the root domain name labcorp.local.
+
+When the screen went pitch black and the hard drive icon stopped flashing after the installation, clicked Machine -> Reset in the top VirtualBox menu to force a hard hardware restart.
+
+The virtual screen cleared instantly, and the server successfully booted up into the "Applying computer settings" screen, leading to the new domain login prompt: LABCORP\Administrator.
+
+Status: Resolved / Closed
+
+--------------------------------------------------------------------------------------------
+
+LAB TROUBLESHOOTING LOG
+[ENTRY 05]
+
+Date/Time: 20 June 2026 / 17:23 BST
+
+Component: Active Directory Users / Account Lockout Tasks
+
+Error Message: "The user name or password is incorrect" (Kept saying this over and over again instead of locking out) and "The syntax of this command is:" (When the command prompt failed).
+
+Symptoms: 
+1. The keyboard and screen completely froze up right at the start when trying to use Server Manager.
+2. After fixing the keyboard, I tried to log out and spam wrong passwords on the bad-login account more than 30 times, but it just wouldn't lock out. It kept saying the password was wrong.
+3. When checking jdoe (John) and bad-login, both profiles looked exactly the same in Active Directory. The "Unlock account" box was there for both, so nothing was actually locked.
+4. When I tried to run the command to fix it, the command prompt threw a syntax help error and didn't work.
+
+Root Cause Analysis: 
+1. VirtualBox crashed its input queue again because the screen buffer got stuck when swapping between things.
+2. New Active Directory domains start with the lockout limit set to 0 by default, which means "never lock out." So spamming it 30 times did nothing. Also, changing the Group Policy doesn't immediately affect the main login screen until you completely restart the server.
+3. The "Unlock account" checkbox is just a permanent button in Windows Server 2022, not a sign that it's locked.
+4. The first command failed because Windows is super picky about spaces, and typing bad-login/active:no squished together breaks the command format.
+
+Resolution Steps:
+1. Closed the frozen VM, saved the state, and went into Windows Task Manager on my laptop to kill VirtualBox Global Interface and VirtualBox Interface to get my keyboard working again.
+2. Logged back in as Admin, opened Group Policy Management, edited the Default Domain Policy, and changed the Account lockout threshold from 0 to 5.
+3. Opened Command Prompt and ran gpupdate /force to try and force the new rule to work.
+4. Logged out and tried to spam the password again, but the login screen was still being stubborn because the server needed a full reboot to apply the policy to the console.
+5. Went back into the Admin account, opened Command Prompt, and tried to run net user bad-login/active:no but got a syntax error because of a missing space.
+6. Fixed the spacing and ran the exact command: net user bad-login /active:no. It finally said it completed successfully.
+7. Opened Active Directory Users and Computers, clicked on Standard Users, and verified that Wrong Password now has a little black down-arrow on its icon, showing it's officially locked down and disabled.
+
+Status: Resolved / Closed
+
+--------------------------------------------------------------------------------------------
+
+Date/Time: 20/06/2026
+
+Component: Windows Server 2022 / Sysmon64 Installation
+
+Error Message: Error: Failed to open xml configuration: sysmonconfig-export.xml
+
+Symptoms: PowerShell failed to initiate the Sysmon installation, displaying a help menu instead of starting the service.
+
+Root Cause Analysis: Windows hides file extensions by default. Renaming the file initially resulted in a hidden double extension, sysmonconfig-export.xml.xml, which caused a configuration mismatch.
+
+Resolution Steps: Used dir in PowerShell to reveal the hidden extension, then executed the installation command using the corrected path: .\sysmon64 -accepteula -i sysmonconfig-export.xml.xml.
+
+Status: Resolved / Fully Operational.
+--------------------------------------------------------------------------------------------
+
+[ENTRY 07]
+Date/Time: 07 July 2026 / 23:43 BST
+
+Component: Microsoft Sentinel / Kusto Query Language (KQL) Editor
+
+Error Message:
+
+"A syntax error has been identified in the query. Query could not be parsed at 'Event' on line [1,10]"
+
+Symptoms:
+
+The Microsoft Sentinel logs interface accepted authentication and allowed code entry, but executing the initial telemetry validation query failed instantly with a red syntax error banner. No data rows or grid tables loaded.
+
+Root Cause Analysis:
+
+Kusto Query Language (KQL) uses strict space-delimited string parsing. The table identifier was manually entered as Security Event with an accidental space character. The KQL parser read Security as an unrecognized standalone table name and could not interpret the trailing Event string string statement.
+
+Resolution Steps:
+
+Clicked into line 1 of the active Microsoft Sentinel query tab.
+
+Deleted the erroneous middle space, unifying the case-sensitive string into a single valid database table token: SecurityEvent.
+
+Re-executed the query string (SecurityEvent | take 10). The parser error cleared instantly, transitioning the interface to a valid structural state showing "No results found from the last 24 hours."
+
+Status: Resolved / Closed
+--------------------------------------------------------------------------------------------
+
+[ENTRY 08]
+Date/Time: 08 July 2026 / 22:01 BST
+
+Component: Azure Monitor Agent (AMA) / Hybrid Log Pipeline Ingestion
+
+Error Message:
+
+"No results found from the last 24 hours." (Continuous data omission across verified functional queries).
+
+Symptoms:
+
+Both SecurityEvent | take 10 and Heartbeat queries returned zero data rows inside Microsoft Sentinel, despite the query syntax being 100% correct. Checking the Azure Arc machine extensions view showed AzureMonitorWindowsAgent holding a status of "Succeeded," but checking the local virtual machine file directory (C:\Packages\Plugins\) showed that the local agent configuration directories were blank or uninitialized. Running manual service management via PowerShell failed due to command formatting (&& token errors) and unrecognized legacy service display strings.
+
+Root Cause Analysis:
+
+The "Succeeded" status on an Azure Arc extension simply indicates that the cloud successfully handed the installation deployment package down to the host hypervisor. However, on-premises VMs running via virtualized environments (VirtualBox) experience a background provisioning propagation lag. The Azure Monitor Agent required extended configuration time to build its local internal system directories (mcsconfig.latest.xml), bind to the host OS background executables (MonAgentCore.exe), and establish a validated handshake up to the cloud workspace.
+
+Resolution Steps:
+
+Allowed the hybrid environment a 24-hour propagation window to naturally settle background registration locks and complete identity handshakes without altering working configurations.
+
+Opened the Microsoft Sentinel Logs portal workspace on July 8th and adjusted the query metadata scope filter from Last 24 hours to Last 48 hours.
+
+Executed a targeted connectivity test query (Heartbeat | where Category == "Azure Monitor Agent" | take 10) to isolate infrastructure breathing from security event generation. The table successfully returned active cloud telemetry records.
+
+Wiped the log utility console and ran the primary hunt command: SecurityEvent | take 10.
+
+Data parsed cleanly, loading multiple rows of live Domain Controller audit logs including system accounts (NT AUTHORITY\SYSTEM) and the local machine principal (LABCORP\LAB-DC-01$).
+
+Status: Resolved / Fully Operational
+--------------------------------------------------------------------------------------------
